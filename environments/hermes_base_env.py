@@ -110,6 +110,10 @@ class HermesAgentEnvConfig(BaseEnvConfig):
         default=1.0,
         description="Sampling temperature for agent generation during rollouts.",
     )
+    agent_top_p: Optional[float] = Field(
+        default=None,
+        description="Nucleus sampling top_p for agent generation. None = provider default.",
+    )
 
     # --- Terminal backend ---
     terminal_backend: str = Field(
@@ -488,6 +492,7 @@ class HermesAgentBaseEnv(BaseEnv):
                         max_turns=self.config.max_agent_turns,
                         task_id=task_id,
                         temperature=self.config.agent_temperature,
+                        top_p=self.config.agent_top_p,
                         max_tokens=self.config.max_token_length,
                         extra_body=self.config.extra_body,
                     )
@@ -505,6 +510,7 @@ class HermesAgentBaseEnv(BaseEnv):
                     max_turns=self.config.max_agent_turns,
                     task_id=task_id,
                     temperature=self.config.agent_temperature,
+                    top_p=self.config.agent_top_p,
                     max_tokens=self.config.max_token_length,
                     extra_body=self.config.extra_body,
                 )
@@ -518,6 +524,7 @@ class HermesAgentBaseEnv(BaseEnv):
                 max_turns=self.config.max_agent_turns,
                 task_id=task_id,
                 temperature=self.config.agent_temperature,
+                top_p=self.config.agent_top_p,
                 max_tokens=self.config.max_token_length,
                 extra_body=self.config.extra_body,
             )
