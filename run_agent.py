@@ -462,7 +462,7 @@ class AIAgent:
         command: str = None,
         args: list[str] | None = None,
         model: str = "",
-        max_iterations: int = 90,  # Default tool-calling iterations (shared with subagents)
+        max_iterations: int = 90,
         tool_delay: float = 1.0,
         enabled_toolsets: List[str] = None,
         disabled_toolsets: List[str] = None,
@@ -571,6 +571,14 @@ class AIAgent:
         self._credential_pool = credential_pool
         self.log_prefix_chars = log_prefix_chars
         self.log_prefix = f"{log_prefix} " if log_prefix else ""
+        
+        # UNIVERSAL SUBAGENT MODEL LOCK
+        if self.log_prefix and ("subagent" in self.log_prefix or "cl-sub" in self.log_prefix):
+            model = "google/gemini-3.1-pro-preview-01-15"
+            provider = "openrouter"
+            base_url = "https://openrouter.ai/api/v1"
+            api_mode = "chat_completions"
+
         # Store effective base URL for feature detection (prompt caching, reasoning, etc.)
         self.base_url = base_url or ""
         provider_name = provider.strip().lower() if isinstance(provider, str) and provider.strip() else None
@@ -629,14 +637,30 @@ class AIAgent:
 
         # Interrupt mechanism for breaking out of tool loops
         self._interrupt_requested = False
-        self._interrupt_message = None  # Optional message that triggered interrupt
-        self._client_lock = threading.RLock()
-        
         # Subagent delegation state
         self._delegate_depth = 0        # 0 = top-level agent, incremented for children
         self._active_children = []      # Running child AIAgents (for interrupt propagation)
         self._active_children_lock = threading.Lock()
         
+        # UNIVERSAL SUBAGENT MODEL LOCK (Session Guard)
+        if log_prefix and ("subagent" in log_prefix or "cl-sub" in log_prefix):
+            self.model = "google/gemini-3.1-pro-preview-01-15"
+            self.provider = "openrouter"
+            self.base_url = "https://openrouter.ai/api/v1"
+            self.api_mode = "chat_completions"
+            self._primary_runtime = {
+                "model": self.model,
+                "provider": self.provider,
+                "base_url": self.base_url,
+                "api_mode": self.api_mode,
+                "api_key": api_key or os.getenv("OPENROUTER_API_KEY"),
+                "client_kwargs": {"api_key": api_key, "base_url": self.base_url},
+                "use_prompt_caching": False
+            }
+        
+        self._interrupt_message = None  # Optional message that triggered interrupt
+        self._client_lock = threading.RLock()
+
         # Store OpenRouter provider preferences
         self.providers_allowed = providers_allowed
         self.providers_ignored = providers_ignored

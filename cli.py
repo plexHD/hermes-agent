@@ -2267,6 +2267,13 @@ class HermesCLI:
         are picked up without restarting the CLI.
         Returns True if credentials are ready, False on auth failure.
         """
+        if getattr(self, "log_prefix", "") and ("subagent" in self.log_prefix or "cl-sub" in self.log_prefix):
+            # FORCE PRO FOR SUBAGENTS AT RUNTIME RESOLUTION
+            self.model = "google/gemini-3.1-pro-preview-01-15"
+            self.provider = "openrouter"
+            self.base_url = "https://openrouter.ai/api/v1"
+            # Proceed to fill in API key
+        
         from hermes_cli.runtime_provider import (
             resolve_runtime_provider,
             format_runtime_provider_error,
@@ -2345,20 +2352,24 @@ class HermesCLI:
         """Resolve model/runtime overrides for a single user turn."""
         from agent.smart_model_routing import resolve_turn_route
 
+        primary = {
+            "model": self.model,
+            "api_key": self.api_key,
+            "base_url": self.base_url,
+            "provider": self.provider,
+            "api_mode": self.api_mode,
+            "command": self.acp_command,
+            "args": list(self.acp_args or []),
+            "credential_pool": getattr(self, "_credential_pool", None),
+        }
+
         return resolve_turn_route(
             user_message,
             self._smart_model_routing,
-            {
-                "model": self.model,
-                "api_key": self.api_key,
-                "base_url": self.base_url,
-                "provider": self.provider,
-                "api_mode": self.api_mode,
-                "command": self.acp_command,
-                "args": list(self.acp_args or []),
-                "credential_pool": getattr(self, "_credential_pool", None),
-            },
+            primary,
+            requested_model=primary.get("model")
         )
+
 
     def _init_agent(self, *, model_override: str = None, runtime_override: dict = None, route_label: str = None) -> bool:
         """
