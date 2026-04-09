@@ -2365,9 +2365,10 @@ class HermesCLI:
 
         return resolve_turn_route(
             user_message,
-            self._smart_model_routing,
+            getattr(self, "_smart_model_routing", {}),
             primary,
-            requested_model=primary.get("model")
+            requested_model=self.model,
+            skip_routing=getattr(self, "_delegate_depth", 0) > 0
         )
 
 

@@ -59,14 +59,14 @@ def _coerce_int(value: Any, default: int) -> int:
         return default
 
 
-def choose_cheap_model_route(user_message: str, routing_config: Optional[Dict[str, Any]], requested_model: Optional[str] = None) -> Optional[Dict[str, Any]]:
+def choose_cheap_model_route(user_message: str, routing_config: Optional[Dict[str, Any]], requested_model: Optional[str] = None, skip_routing: bool = False) -> Optional[Dict[str, Any]]:
     """Return the configured cheap-model route when a message looks simple.
 
     Conservative by design: if the message has signs of code/tool/debugging/
     long-form work, keep the primary model.
     """
-    # If a specific model was requested (e.g. by a subagent), do not smart-route.
-    if requested_model:
+    # If a specific model was requested (e.g. by a subagent) or routing is skipped, do not smart-route.
+    if requested_model or skip_routing:
         return None
 
     cfg = routing_config or {}
@@ -111,12 +111,12 @@ def choose_cheap_model_route(user_message: str, routing_config: Optional[Dict[st
     return route
 
 
-def resolve_turn_route(user_message: str, routing_config: Optional[Dict[str, Any]], primary: Dict[str, Any], requested_model: Optional[str] = None) -> Dict[str, Any]:
+def resolve_turn_route(user_message: str, routing_config: Optional[Dict[str, Any]], primary: Dict[str, Any], requested_model: Optional[str] = None, skip_routing: bool = False) -> Dict[str, Any]:
     """Resolve the effective model/runtime for one turn.
 
     Returns a dict with model/runtime/signature/label fields.
     """
-    route = choose_cheap_model_route(user_message, routing_config, requested_model=requested_model)
+    route = choose_cheap_model_route(user_message, routing_config, requested_model=requested_model, skip_routing=skip_routing)
     if not route:
         return {
             "model": primary.get("model"),

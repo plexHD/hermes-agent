@@ -1,3 +1,7 @@
+---
+name: heremes-agent
+model: google/gemini-3.1-pro-preview-01-15
+---
 # Hermes Agent - Development Guide
 
 Instructions for AI coding assistants and developers working on the hermes-agent codebase.

@@ -277,13 +277,14 @@ def _build_child_agent(
         child_thinking_cb = _child_thinking
 
     # Resolve effective credentials: config override > parent inherit
-    # FORCE PRO FOR SUBAGENTS
-    effective_model = "google/gemini-3.1-pro-preview-01-15"
-    
-    effective_provider = "openrouter"
-    effective_base_url = "https://openrouter.ai/api/v1"
-    effective_api_key = os.getenv("OPENROUTER_API_KEY") or parent_api_key
-    effective_api_mode = "chat_completions"
+    effective_model = creds.get("model") or getattr(parent_agent, "model", None)
+    effective_provider = creds.get("provider") or getattr(parent_agent, "provider", None)
+    effective_base_url = creds.get("base_url") or getattr(parent_agent, "base_url", None)
+    effective_api_key = creds.get("api_key") or parent_api_key
+    effective_api_mode = creds.get("api_mode") or getattr(parent_agent, "api_mode", None)
+
+    # Use explicitly configured delegation model if available, otherwise parent
+    effective_model = creds.get("model") or configured_delegation_model or getattr(parent_agent, "model", None)
 
     effective_acp_command = override_acp_command or getattr(parent_agent, "acp_command", None)
     effective_acp_args = list(override_acp_args if override_acp_args is not None else (getattr(parent_agent, "acp_args", []) or []))
@@ -549,15 +550,15 @@ def delegate_task(
     default_max_iter = cfg.get("max_iterations", DEFAULT_MAX_ITERATIONS)
     effective_max_iter = max_iterations or default_max_iter
 
-    # Resolve delegation credentials (provider:model pair).
-    # When delegation.provider is configured, this resolves the full credential
-    # bundle (base_url, api_key, api_mode) via the same runtime provider system
-    # used by CLI/gateway startup.  When unconfigured, returns None values so
-    # children inherit from the parent.
+    # Resolved delegation credentials (provider:model pair).
     try:
         creds = _resolve_delegation_credentials(cfg, parent_agent)
     except ValueError as exc:
         return tool_error(str(exc))
+
+    # Log the resolved credentials for debugging
+    # logger.info("Delegation credentials resolved: model=%s, provider=%s", 
+    #             creds.get('model'), creds.get('provider'))
 
     # Normalize to task list
     if tasks and isinstance(tasks, list):
@@ -791,6 +792,7 @@ def _resolve_delegation_credentials(cfg: dict, parent_agent) -> dict:
     # Provider is configured — resolve full credentials
     try:
         from hermes_cli.runtime_provider import resolve_runtime_provider
+        # Force fresh resolution so it doesn't use cached parent runtime
         runtime = resolve_runtime_provider(requested=configured_provider)
     except Exception as exc:
         raise ValueError(
