@@ -2364,12 +2364,20 @@ class HermesCLI:
             "credential_pool": getattr(self, "_credential_pool", None),
         }
 
+        # Subagents (delegate_task) should never be smart-routed.
+        # This prevents "Goal" messages from being downgraded to Flash.
+        skip_routing = getattr(self, "_delegate_depth", 0) > 0
+        if not skip_routing:
+             # Legacy check — if skip_routing was passed as a kwarg to chat/run_conversation
+             skip_routing = getattr(self, "skip_routing", False)
+
+        from agent.smart_model_routing import resolve_turn_route
         return resolve_turn_route(
             user_message,
             getattr(self, "_smart_model_routing", {}),
             primary,
             requested_model=self.model,
-            skip_routing=getattr(self, "_delegate_depth", 0) > 0
+            skip_routing=skip_routing
         )
 
 

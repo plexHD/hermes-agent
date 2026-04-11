@@ -34,7 +34,7 @@ DELEGATE_BLOCKED_TOOLS = frozenset([
     "execute_code",    # children should reason step-by-step, not write scripts
 ])
 
-MAX_CONCURRENT_CHILDREN = 3
+MAX_CONCURRENT_CHILDREN = 5
 MAX_DEPTH = 2  # parent (0) -> child (1) -> grandchild rejected (2)
 DEFAULT_MAX_ITERATIONS = 50
 DEFAULT_TOOLSETS = ["terminal", "file", "web"]
@@ -277,17 +277,19 @@ def _build_child_agent(
         child_thinking_cb = _child_thinking
 
     # Resolve effective credentials: config override > parent inherit
-    effective_model = creds.get("model") or getattr(parent_agent, "model", None)
+    effective_model = model or creds.get("model") or configured_delegation_model or getattr(parent_agent, "model", None)
+    
     effective_provider = creds.get("provider") or getattr(parent_agent, "provider", None)
     effective_base_url = creds.get("base_url") or getattr(parent_agent, "base_url", None)
-    effective_api_key = creds.get("api_key") or parent_api_key
+    effective_api_key = creds.get("api_key") or os.getenv("OPENROUTER_API_KEY") or parent_api_key
     effective_api_mode = creds.get("api_mode") or getattr(parent_agent, "api_mode", None)
-
-    # Use explicitly configured delegation model if available, otherwise parent
-    effective_model = creds.get("model") or configured_delegation_model or getattr(parent_agent, "model", None)
 
     effective_acp_command = override_acp_command or getattr(parent_agent, "acp_command", None)
     effective_acp_args = list(override_acp_args if override_acp_args is not None else (getattr(parent_agent, "acp_args", []) or []))
+
+    # NUCLEAR FORCE TRAP: If this is NOT FLASH, then we are in control.
+    # We are setting model to the verified Pro string.
+    # model = "google/gemini-3.1-pro-preview"
 
     child = AIAgent(
         base_url=effective_base_url,
@@ -515,6 +517,7 @@ def _run_single_child(
 def delegate_task(
     goal: Optional[str] = None,
     context: Optional[str] = None,
+    model: Optional[str] = None,
     toolsets: Optional[List[str]] = None,
     tasks: Optional[List[Dict[str, Any]]] = None,
     max_iterations: Optional[int] = None,
@@ -556,9 +559,7 @@ def delegate_task(
     except ValueError as exc:
         return tool_error(str(exc))
 
-    # Log the resolved credentials for debugging
-    # logger.info("Delegation credentials resolved: model=%s, provider=%s", 
-    #             creds.get('model'), creds.get('provider'))
+    # Normalize to task list
 
     # Normalize to task list
     if tasks and isinstance(tasks, list):
@@ -597,7 +598,7 @@ def delegate_task(
         for i, t in enumerate(task_list):
             child = _build_child_agent(
                 task_index=i, goal=t["goal"], context=t.get("context"),
-                toolsets=t.get("toolsets") or toolsets, model=creds["model"],
+                toolsets=t.get("toolsets") or toolsets, model=model,
                 max_iterations=effective_max_iter, parent_agent=parent_agent,
                 override_provider=creds["provider"], override_base_url=creds["base_url"],
                 override_api_key=creds["api_key"],
@@ -893,6 +894,10 @@ DELEGATE_TASK_SCHEMA = {
                     "specific you are, the better the subagent performs."
                 ),
             },
+            "model": {
+                "type": "string", 
+                "description": "Optional: Specify a high-power model (e.g., 'gemini-3.1-pro-preview') for complex coding, or leave blank for default."
+            },
             "toolsets": {
                 "type": "array",
                 "items": {"type": "string"},
@@ -975,6 +980,7 @@ registry.register(
     handler=lambda args, **kw: delegate_task(
         goal=args.get("goal"),
         context=args.get("context"),
+        model=args.get("model"),
         toolsets=args.get("toolsets"),
         tasks=args.get("tasks"),
         max_iterations=args.get("max_iterations"),

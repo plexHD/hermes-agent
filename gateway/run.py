@@ -793,12 +793,16 @@ class GatewayRunner:
             "args": list(runtime_kwargs.get("args") or []),
             "credential_pool": runtime_kwargs.get("credential_pool"),
         }
+        # Subagents (delegate_task) should never be smart-routed.
+        # This prevents "Goal" messages from being downgraded to Flash.
+        skip_routing = getattr(self, "_delegate_depth", 0) > 0
+        
         return resolve_turn_route(
             user_message,
             getattr(self, "_smart_model_routing", {}),
             primary,
             requested_model=primary.get("model"),
-            skip_routing=getattr(self, "_delegate_depth", 0) > 0
+            skip_routing=skip_routing
         )
 
     async def _handle_adapter_fatal_error(self, adapter: BasePlatformAdapter) -> None:
